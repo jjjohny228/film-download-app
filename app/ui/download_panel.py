@@ -155,6 +155,7 @@ class DownloadPanel(QWidget):
         def on_error(msg: str) -> None:
             row.set_error(msg)
             self.status_message.emit(f"Ошибка получения ссылки: {msg}")
+            self._workers[:] = [(r, w) for r, w in self._workers if w is not resolver]
 
         resolver.url_ready.connect(on_url_ready)
         resolver.error.connect(on_error)

@@ -74,7 +74,7 @@ def get_stream_url(
     episode: int = 0,
 ) -> str:
     film = HdRezkaApi(url)
-    if season and episode:
+    if season > 0 and episode > 0:
         stream = film.getStream(season=season, episode=episode, translation=translator_id)
     else:
         stream = film.getStream(translation=translator_id)

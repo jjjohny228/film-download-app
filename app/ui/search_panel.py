@@ -67,6 +67,10 @@ class SearchPanel(QWidget):
         self._results = []
         self.status_message.emit("Поиск…")
 
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.quit()
+            self._worker.wait()
+
         self._worker = _SearchWorker(query, get_rezka_url())
         self._worker.results_ready.connect(self._on_results)
         self._worker.error.connect(self._on_error)

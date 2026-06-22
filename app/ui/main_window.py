@@ -1,9 +1,9 @@
-from PySide6.QtWidgets import QMainWindow, QSplitter, QStatusBar
 from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMainWindow, QSplitter, QStatusBar
 
-from app.ui.search_panel import SearchPanel
 from app.ui.detail_panel import DetailPanel
 from app.ui.download_panel import DownloadPanel
+from app.ui.search_panel import SearchPanel
 
 
 class MainWindow(QMainWindow):

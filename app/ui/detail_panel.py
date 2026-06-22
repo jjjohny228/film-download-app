@@ -113,6 +113,10 @@ class DetailPanel(QWidget):
         self._episode_combo.clear()
         self.status_message.emit("Загрузка информации…")
 
+        if self._worker is not None and self._worker.isRunning():
+            self._worker.quit()
+            self._worker.wait()
+
         self._worker = _InfoWorker(result.url)
         self._worker.info_ready.connect(self._on_info_ready)
         self._worker.error.connect(self._on_error)
