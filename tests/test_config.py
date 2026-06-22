@@ -11,7 +11,7 @@ def test_admin_ids_parsed_from_string(monkeypatch):
 
 def test_admin_ids_empty_by_default(monkeypatch):
     monkeypatch.setenv("BOT_TOKEN", "test:token")
-    monkeypatch.delenv("ADMIN_IDS", raising=False)
+    monkeypatch.setenv("ADMIN_IDS", "")
     from bot.config import Settings
     s = Settings()
     assert s.admin_ids == []

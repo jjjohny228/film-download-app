@@ -115,6 +115,26 @@ def _sync_get_stream_url(
     return urls[0]
 
 
+_PROXY_ERROR_MARKERS = (
+    "403",
+    "503",
+    "ProxyError",
+    "Unable to connect to proxy",
+    "NewConnectionError",
+    "Max retries exceeded",
+    "Connection refused",
+    "Connection reset",
+    "RemoteDisconnected",
+    "timed out",
+    "ConnectTimeoutError",
+    "SSLError",
+)
+
+
+def _is_proxy_error(msg: str) -> bool:
+    return any(marker.lower() in msg.lower() for marker in _PROXY_ERROR_MARKERS)
+
+
 class RezkaService:
     def __init__(self, rezka_url: str) -> None:
         self.rezka_url = rezka_url
@@ -138,7 +158,7 @@ class RezkaService:
                 return result
             except Exception as e:
                 msg = str(e)
-                if "403" in msg or "503" in msg:
+                if _is_proxy_error(msg):
                     await ProxyService.mark_failed(proxy.id)
                     last_err = e
                 else:
