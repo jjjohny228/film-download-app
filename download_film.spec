@@ -1,4 +1,7 @@
 # download_film.spec
+import sys
+
+icon_file = "icon.icns" if sys.platform == "darwin" else "icon.ico"
 
 a = Analysis(
     ["app/main.py"],
@@ -30,7 +33,8 @@ exe = EXE(
     a.zipfiles,
     a.datas,
     [],
-    name="DownloadFilm",
+    name="MovieDownloader",
+    icon=icon_file,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -45,10 +49,15 @@ exe = EXE(
 )
 
 # Mac: wrap in .app bundle
-import sys
 if sys.platform == "darwin":
     app = BUNDLE(
         exe,
-        name="DownloadFilm.app",
-        bundle_identifier="com.downloadfilm.app",
+        name="MovieDownloader.app",
+        icon="icon.icns",
+        bundle_identifier="com.moviedownloader.app",
+        info_plist={
+            "NSHighResolutionCapable": True,
+            "LSUIElement": False,
+            "CFBundleDisplayName": "MovieDownloader",
+        },
     )

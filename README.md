@@ -1,15 +1,15 @@
-# DownloadFilmBot
+# MovieDownloader
 
-Telegram-бот для поиска фильмов и сериалов на HdRezka с выдачей прямых ссылок для скачивания.
+Десктопное приложение для поиска и скачивания фильмов/сериалов с HdRezka.
 
 ## Стек
 
 | Компонент | Версия |
 |-----------|--------|
 | Python | 3.11+ |
-| aiogram | 3.x |
-| Peewee ORM | 3.x (SQLite) |
+| PySide6 | UI фреймворк |
 | HdRezkaApi | 11.x |
+| httpx | HTTP-клиент |
 | uv | пакетный менеджер |
 | ruff | линтер |
 
@@ -19,78 +19,21 @@ Telegram-бот для поиска фильмов и сериалов на HdRe
 # 1. Клонировать репо
 git clone <repo> && cd DownloadFilmBot
 
-# 2. Создать .env
-cp .env.example .env
-# Заполнить BOT_TOKEN и ADMIN_IDS
-
-# 3. Установить зависимости
+# 2. Установить зависимости
 uv sync
 
-# 4. Запустить
-uv run python -m bot.main
-# или
-uv run python main.py
+# 3. Запустить
+uv run python -m app.main
 ```
-
-## Конфигурация
-
-Файл `.env`:
-
-| Переменная | Описание | Пример |
-|-----------|---------|-------|
-| `BOT_TOKEN` | Токен из @BotFather | `123:ABC...` |
-| `ADMIN_IDS` | ID администраторов, через запятую | `123456789,987654321` |
-| `REZKA_URL` | Зеркало HdRezka | `https://hdrezka.ag` |
-| `DB_PATH` | Путь к SQLite базе | `data/bot.db` |
-
-## Функциональность
-
-### Пользователь
-
-| Кнопка | Действие |
-|--------|---------|
-| 🔍 Найти фильм | Поиск по названию → карусель результатов |
-| 👤 Профиль | ID, дата регистрации, счётчики поисков и скачиваний |
-
-**Флоу скачивания (фильм):**
-```
-Ввести название → карусель ← → → 🎬 Скачать
-→ выбор перевода → выбор качества (480/720/1080p) → ссылка
-```
-
-**Флоу скачивания (сериал):**
-```
-→ 🎬 Скачать → перевод → сезон → серия → качество → ссылка
-```
-
-### Администратор
-
-| Кнопка | Действие |
-|--------|---------|
-| 📢 Рассылка | Отправить текст/фото/видео всем пользователям |
-| 📊 Статистика | Кол-во юзеров, поисков, скачиваний, прокси |
-| 🌐 Загрузить прокси | Добавить прокси списком |
-
-## Прокси
-
-**Формат строки:**
-```
-http 85.195.81.148:10772:login:password
-socks5 1.2.3.4:1080:user:pass
-http 91.108.0.1:3128
-```
-
-**Логика ротации:**
-- При ошибке 403/503 → `fail_count += 1`
-- При `fail_count >= 3` → прокси деактивируется
-- Если активных прокси нет → все пользователи получают уведомление, администраторам приходит алерт
 
 ## Разработка
 
 ```bash
-# Линтинг
-uv run ruff check .
-uv run ruff format .
+# Линтинг (проверка)
+uv run ruff check app/ tests/
+
+# Линтинг (автофикс)
+uv run ruff check app/ tests/ --fix
 
 # Тесты
 uv run pytest
@@ -99,34 +42,74 @@ uv run pytest
 uv run pytest -v
 ```
 
+## Сборка дистрибутива
+
+### Исполняемый файл (Windows / macOS)
+
+```bash
+uv run pyinstaller download_film.spec
+```
+
+Результат:
+- macOS → `dist/MovieDownloader.app`
+- Windows → `dist/MovieDownloader.exe`
+
+### DMG-образ для macOS
+
+После успешной сборки `.app`:
+
+```bash
+# Установить create-dmg (однократно)
+brew install create-dmg
+
+# Собрать DMG
+create-dmg \
+  --volname "MovieDownloader" \
+  --volicon "icon.icns" \
+  --window-pos 200 120 \
+  --window-size 600 400 \
+  --icon-size 100 \
+  --icon "MovieDownloader.app" 175 190 \
+  --hide-extension "MovieDownloader.app" \
+  --app-drop-link 425 190 \
+  "MovieDownloader.dmg" \
+  "dist/MovieDownloader.app"
+```
+
+Либо через встроенный `hdiutil` без сторонних зависимостей:
+
+```bash
+# Создать временную папку для содержимого образа
+mkdir -p dmg_staging
+cp -r dist/MovieDownloader.app dmg_staging/
+
+# Создать DMG
+hdiutil create \
+  -volname "MovieDownloader" \
+  -srcfolder dmg_staging \
+  -ov -format UDZO \
+  MovieDownloader.dmg
+
+# Убрать временную папку
+rm -rf dmg_staging
+```
+
 ## Структура проекта
 
 ```
 DownloadFilmBot/
-├── bot/
+├── app/
 │   ├── main.py              # точка входа
-│   ├── config.py            # настройки из .env
-│   ├── database/
-│   │   ├── models.py        # Peewee модели (User, Proxy)
-│   │   └── db.py            # init_db, run_sync
-│   ├── services/
-│   │   ├── proxy.py         # ProxyService
-│   │   └── rezka.py         # RezkaService (обёртка HdRezkaApi)
-│   ├── handlers/
-│   │   ├── user.py          # /start, профиль, поиск, скачивание
-│   │   └── admin.py         # рассылка, статистика, прокси
-│   ├── keyboards/
-│   │   ├── reply.py         # главное меню
-│   │   └── inline.py        # карусель, качество, переводы, сезоны
-│   ├── states/
-│   │   └── states.py        # FSM состояния
-│   └── middlewares/
-│       └── user.py          # авто-регистрация + AdminFilter
+│   ├── i18n.py              # интернационализация (en/ru/uk)
+│   ├── ui/
+│   │   ├── main_window.py   # главное окно
+│   │   ├── search_panel.py  # поиск фильмов
+│   │   ├── detail_panel.py  # детали / выбор качества
+│   │   └── download_panel.py# очередь загрузок
+│   └── utils/
+│       └── settings.py      # обёртка QSettings
 ├── tests/
-│   ├── test_config.py
-│   ├── test_proxy_service.py
-│   └── test_keyboards.py
+├── download_film.spec       # конфиг PyInstaller
 ├── pyproject.toml
-├── .env.example
 └── README.md
 ```

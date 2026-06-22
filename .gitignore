@@ -8,3 +8,15 @@ __pycache__/
 *.egg-info/
 dist/
 build/
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# PyInstaller artifacts
+*.dmg
+
+# Icons (binary assets)
+icon.icns
+icon.iconset/
+icon.png

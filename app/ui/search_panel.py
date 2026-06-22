@@ -20,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app import i18n
 from app.core.rezka import SearchResult, search
 from app.utils.settings import get_rezka_url
 
@@ -27,6 +28,25 @@ CARD_W = 180
 CARD_H = 270
 CARD_RADIUS = 12
 POSTER_PLACEHOLDER = "#1e1e26"
+GRID_COLS = 4
+GRID_H_SPACING = 14
+GRID_V_SPACING = 14
+
+
+class _MagnifierWidget(QWidget):
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setFixedSize(20, 20)
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        pen = QPen(QColor("#6b7280"), 2)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        p.setPen(pen)
+        p.setBrush(Qt.BrushStyle.NoBrush)
+        p.drawEllipse(2, 2, 12, 12)
+        p.drawLine(12, 12, 18, 18)
 
 
 class _SearchWorker(QThread):
@@ -102,10 +122,8 @@ class _FilmCard(QWidget):
         path.addRoundedRect(rect, CARD_RADIUS, CARD_RADIUS)
         p.setClipPath(path)
 
-        # background
         p.fillRect(rect, QColor(POSTER_PLACEHOLDER))
 
-        # poster image
         if self._pixmap:
             x = (self._pixmap.width() - rect.width()) // 2
             y = (self._pixmap.height() - rect.height()) // 2
@@ -115,20 +133,17 @@ class _FilmCard(QWidget):
                 QRect(x, y, rect.width(), rect.height()),
             )
         else:
-            # placeholder icon
             p.setPen(QColor("#3a3a4a"))
             icon_font = QFont()
             icon_font.setPointSize(32)
             p.setFont(icon_font)
             p.drawText(rect, Qt.AlignmentFlag.AlignCenter, "🎬")
 
-        # bottom gradient overlay
         grad = QLinearGradient(0, rect.height() * 0.45, 0, rect.height())
         grad.setColorAt(0.0, QColor(0, 0, 0, 0))
         grad.setColorAt(1.0, QColor(0, 0, 0, 230))
         p.fillRect(rect, grad)
 
-        # year (small, muted)
         if self._result.year:
             p.setClipping(False)
             yr_font = QFont()
@@ -139,7 +154,6 @@ class _FilmCard(QWidget):
             p.drawText(yr_rect, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                        self._result.year)
 
-        # title
         p.setClipping(False)
         title_font = QFont()
         title_font.setPointSize(11)
@@ -150,12 +164,8 @@ class _FilmCard(QWidget):
         flags = Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignBottom | Qt.TextFlag.TextWordWrap
         p.drawText(title_rect, flags, self._result.title)
 
-        # selected border
         p.setClipping(False)
-        if self._selected:
-            pen = QPen(QColor("#3b82f6"), 3)
-        else:
-            pen = QPen(QColor("#2a2a3a"), 1)
+        pen = QPen(QColor("#3b82f6"), 3) if self._selected else QPen(QColor("#2a2a3a"), 1)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
         full_rect = self.rect().adjusted(1, 1, -1, -1)
@@ -180,40 +190,40 @@ class SearchPanel(QWidget):
         layout.setContentsMargins(20, 20, 20, 16)
         layout.setSpacing(16)
 
-        # Search bar
+        # Search row: [frame: icon + input] [Search button]
+        search_row = QHBoxLayout()
+        search_row.setSpacing(10)
+
         bar = QFrame()
         bar.setObjectName("searchBar")
         bar.setFixedHeight(48)
         bar_layout = QHBoxLayout(bar)
-        bar_layout.setContentsMargins(16, 0, 8, 0)
+        bar_layout.setContentsMargins(16, 0, 16, 0)
         bar_layout.setSpacing(8)
-
-        icon_lbl = QLabel("🔍")
-        icon_lbl.setFixedWidth(20)
-        bar_layout.addWidget(icon_lbl)
+        bar_layout.addWidget(_MagnifierWidget())
 
         self._input = QLineEdit()
-        self._input.setPlaceholderText("Search for movies, series…")
+        self._input.setPlaceholderText(i18n.t("search_placeholder"))
         self._input.setFrame(False)
         self._input.setObjectName("searchInput")
         self._input.returnPressed.connect(self._do_search)
         bar_layout.addWidget(self._input)
 
-        self._btn = QPushButton("Search")
+        search_row.addWidget(bar, 1)
+
+        self._btn = QPushButton(i18n.t("search_btn"))
         self._btn.setObjectName("searchBtn")
-        self._btn.setFixedHeight(34)
+        self._btn.setFixedHeight(48)
         self._btn.clicked.connect(self._do_search)
-        bar_layout.addWidget(self._btn)
+        search_row.addWidget(self._btn)
 
-        layout.addWidget(bar)
+        layout.addLayout(search_row)
 
-        # Heading
-        self._heading = QLabel("Search Results")
+        self._heading = QLabel(i18n.t("search_results"))
         self._heading.setObjectName("sectionHeading")
         self._heading.setVisible(False)
         layout.addWidget(self._heading)
 
-        # Cards scroll area
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         self._scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
@@ -221,16 +231,52 @@ class SearchPanel(QWidget):
         self._scroll.setFrameShape(QFrame.Shape.NoFrame)
 
         self._cards_container = QWidget()
-        self._cards_layout = _FlowLayout(self._cards_container, h_spacing=14, v_spacing=14)
+        self._cards_vbox = QVBoxLayout(self._cards_container)
+        self._cards_vbox.setContentsMargins(0, 0, 0, 0)
+        self._cards_vbox.setSpacing(GRID_V_SPACING)
+        self._cards_vbox.addStretch()
         self._scroll.setWidget(self._cards_container)
         layout.addWidget(self._scroll)
 
+    def retranslate_ui(self) -> None:
+        self._input.setPlaceholderText(i18n.t("search_placeholder"))
+        self._btn.setText(i18n.t("search_btn"))
+        self._heading.setText(i18n.t("search_results"))
+
+    # ── Grid management ─────────────────────────────────────────
+
+    def _clear_layout(self) -> None:
+        """Remove all row QHBoxLayouts and stretches from the VBoxLayout."""
+        while self._cards_vbox.count():
+            item = self._cards_vbox.takeAt(0)
+            sub = item.layout()
+            if sub:
+                while sub.count():
+                    sub.takeAt(0)
+
+    def _rebuild_grid(self) -> None:
+        self._clear_layout()
+        current_row: QHBoxLayout | None = None
+        for i, card in enumerate(self._cards):
+            if i % GRID_COLS == 0:
+                current_row = QHBoxLayout()
+                current_row.setSpacing(GRID_H_SPACING)
+                current_row.setContentsMargins(0, 0, 0, 0)
+                self._cards_vbox.addLayout(current_row)
+            current_row.addWidget(card)  # type: ignore[union-attr]
+        if current_row is not None:
+            current_row.addStretch()
+        self._cards_vbox.addStretch()
+
     def _clear_cards(self) -> None:
+        self._clear_layout()
         for card in self._cards:
-            self._cards_layout.removeWidget(card)
             card.deleteLater()
         self._cards.clear()
         self._selected_idx = -1
+        self._cards_vbox.addStretch()
+
+    # ── Workers ──────────────────────────────────────────────────
 
     def _stop_poster_workers(self) -> None:
         for w in self._poster_workers:
@@ -247,7 +293,7 @@ class SearchPanel(QWidget):
         self._clear_cards()
         self._stop_poster_workers()
         self._results = []
-        self.status_message.emit("Searching…")
+        self.status_message.emit(i18n.t("searching"))
 
         if self._worker is not None and self._worker.isRunning():
             self._worker.quit()
@@ -265,7 +311,7 @@ class SearchPanel(QWidget):
 
         if not results:
             self._heading.setVisible(False)
-            self.status_message.emit("Nothing found")
+            self.status_message.emit(i18n.t("nothing_found"))
             return
 
         self._heading.setVisible(True)
@@ -273,23 +319,22 @@ class SearchPanel(QWidget):
         for i, r in enumerate(results):
             card = _FilmCard(i, r)
             card.clicked.connect(self._on_card_clicked)
-            self._cards_layout.addWidget(card)
             self._cards.append(card)
-
             if r.poster:
                 pw = _PosterWorker(i, r.poster)
                 pw.pixmap_ready.connect(self._on_pixmap)
                 self._poster_workers.append(pw)
                 pw.start()
 
-        self.status_message.emit(f"Found: {len(results)}")
+        self._rebuild_grid()
+        self.status_message.emit(i18n.t("found", n=len(results)))
 
     def _on_pixmap(self, index: int, px: QPixmap) -> None:
         if 0 <= index < len(self._cards):
             self._cards[index].set_pixmap(px)
 
     def _on_card_clicked(self, index: int) -> None:
-        if self._selected_idx >= 0 and self._selected_idx < len(self._cards):
+        if 0 <= self._selected_idx < len(self._cards):
             self._cards[self._selected_idx].set_selected(False)
         self._selected_idx = index
         self._cards[index].set_selected(True)
@@ -297,59 +342,4 @@ class SearchPanel(QWidget):
 
     def _on_error(self, msg: str) -> None:
         self._btn.setEnabled(True)
-        self.status_message.emit(f"Error: {msg}")
-
-
-class _FlowLayout(QVBoxLayout):
-    """Simple wrapping grid layout using multiple QHBoxLayout rows."""
-
-    def __init__(self, parent: QWidget, h_spacing: int = 10, v_spacing: int = 10) -> None:
-        super().__init__(parent)
-        self.setContentsMargins(0, 0, 0, 0)
-        self.setSpacing(v_spacing)
-        self._h_spacing = h_spacing
-        self._widgets: list[QWidget] = []
-        self._row_layouts: list[QHBoxLayout] = []
-        self._build_row()
-
-    def _build_row(self) -> None:
-        row = QHBoxLayout()
-        row.setSpacing(self._h_spacing)
-        row.setContentsMargins(0, 0, 0, 0)
-        self._row_layouts.append(row)
-        self.addLayout(row)
-
-    def addWidget(self, widget: QWidget) -> None:  # noqa: N802
-        self._widgets.append(widget)
-        self._relayout()
-
-    def removeWidget(self, widget: QWidget) -> None:  # noqa: N802
-        if widget in self._widgets:
-            self._widgets.remove(widget)
-
-    def _relayout(self) -> None:
-        # Clear rows
-        for row in self._row_layouts:
-            while row.count():
-                item = row.takeAt(0)
-                if item.widget():
-                    item.widget().setParent(None)  # type: ignore[arg-type]
-        for i in reversed(range(len(self._row_layouts))):
-            row = self._row_layouts.pop(i)
-            self.removeItem(row)
-
-        self._row_layouts.clear()
-        self._build_row()
-
-        # Distribute widgets across rows (4 per row)
-        cols = 4
-        for idx, widget in enumerate(self._widgets):
-            if idx > 0 and idx % cols == 0:
-                self._build_row()
-            self._row_layouts[-1].addWidget(widget)
-
-        # Fill last row with stretch
-        if self._row_layouts:
-            self._row_layouts[-1].addStretch()
-
-        self.addStretch()
+        self.status_message.emit(i18n.t("error_msg", msg=msg))

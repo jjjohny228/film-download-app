@@ -1,8 +1,13 @@
 import sys
+from pathlib import Path
 
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
+import app.i18n as i18n
 from app.ui.main_window import MainWindow
+
+_ICON_PATH = Path(__file__).parent.parent / "icon.png"
 
 STYLESHEET = """
 /* ── Base ───────────────────────────────────────────── */
@@ -18,8 +23,7 @@ QWidget#topBar {
     background-color: #0d0d0f;
     border-bottom: 1px solid #1f1f27;
 }
-QLabel#logoIcon  { color: #3b82f6; }
-QLabel#logoText  { color: #ffffff; }
+QLabel#logoText  { color: #ffffff; letter-spacing: 1px; }
 
 /* ── Search bar frame ────────────────────────────────── */
 QFrame#searchBar {
@@ -71,6 +75,23 @@ QPushButton#linkBtn {
     padding: 0px 4px;
 }
 QPushButton#linkBtn:hover { color: #60a5fa; }
+
+/* ── Language switcher ───────────────────────────────── */
+QPushButton#langBtn {
+    background: transparent;
+    color: #6b7280;
+    border: 1px solid #2a2a38;
+    border-radius: 6px;
+    padding: 0px 10px;
+    font-size: 11px;
+    font-weight: 600;
+}
+QPushButton#langBtn:checked {
+    background: #3b82f6;
+    border-color: #3b82f6;
+    color: #ffffff;
+}
+QPushButton#langBtn:hover:!checked { border-color: #4b5563; color: #d1d5db; }
 
 /* ── Quality pill buttons ────────────────────────────── */
 QPushButton#qualityBtn {
@@ -269,8 +290,11 @@ QStatusBar {
 
 def main() -> None:
     app = QApplication(sys.argv)
-    app.setApplicationName("DownloadFilm")
-    app.setOrganizationName("DownloadFilm")
+    app.setApplicationName("MovieDownloader")
+    app.setOrganizationName("MovieDownloader")
+    if _ICON_PATH.exists():
+        app.setWindowIcon(QIcon(str(_ICON_PATH)))
+    i18n.init()
     app.setStyleSheet(STYLESHEET)
     window = MainWindow()
     window.show()

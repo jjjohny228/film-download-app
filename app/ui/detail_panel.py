@@ -13,10 +13,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app import i18n
 from app.core.rezka import FilmInfo, SearchResult, get_film_info
 from app.utils.settings import get_download_folder, set_download_folder
 
-QUALITIES = ["1080p", "720p", "480p", "360p"]
+QUALITIES = ["360p", "480p", "720p", "1080p"]
 
 
 class _InfoWorker(QThread):
@@ -54,13 +55,11 @@ class DetailPanel(QWidget):
         layout.setContentsMargins(24, 24, 24, 24)
         layout.setSpacing(0)
 
-        # "NOW SELECTING" header
-        now_label = QLabel("NOW SELECTING")
-        now_label.setObjectName("nowSelecting")
-        layout.addWidget(now_label)
+        self._now_label = QLabel(i18n.t("now_selecting"))
+        self._now_label.setObjectName("nowSelecting")
+        layout.addWidget(self._now_label)
         layout.addSpacing(6)
 
-        # Title
         self._title_label = QLabel("—")
         self._title_label.setObjectName("detailTitle")
         self._title_label.setWordWrap(True)
@@ -71,10 +70,9 @@ class DetailPanel(QWidget):
         layout.addWidget(self._title_label)
         layout.addSpacing(20)
 
-        # Translator
-        tr_label = QLabel("Dubbing / Translation")
-        tr_label.setObjectName("fieldLabel")
-        layout.addWidget(tr_label)
+        self._tr_label = QLabel(i18n.t("dubbing_label"))
+        self._tr_label.setObjectName("fieldLabel")
+        layout.addWidget(self._tr_label)
         layout.addSpacing(6)
         self._translator_combo = QComboBox()
         self._translator_combo.setObjectName("detailCombo")
@@ -82,12 +80,11 @@ class DetailPanel(QWidget):
         layout.addWidget(self._translator_combo)
         layout.addSpacing(16)
 
-        # Season + Episode side by side
         se_row = QHBoxLayout()
         se_row.setSpacing(12)
 
         season_col = QVBoxLayout()
-        self._season_label = QLabel("Season")
+        self._season_label = QLabel(i18n.t("season"))
         self._season_label.setObjectName("fieldLabel")
         self._season_combo = QComboBox()
         self._season_combo.setObjectName("detailCombo")
@@ -98,7 +95,7 @@ class DetailPanel(QWidget):
         season_col.addWidget(self._season_combo)
 
         episode_col = QVBoxLayout()
-        self._episode_label = QLabel("Episode")
+        self._episode_label = QLabel(i18n.t("episode"))
         self._episode_label.setObjectName("fieldLabel")
         self._episode_combo = QComboBox()
         self._episode_combo.setObjectName("detailCombo")
@@ -114,10 +111,9 @@ class DetailPanel(QWidget):
         layout.addWidget(self._se_widget)
         layout.addSpacing(16)
 
-        # Quality
-        q_label = QLabel("Quality")
-        q_label.setObjectName("fieldLabel")
-        layout.addWidget(q_label)
+        self._q_label = QLabel(i18n.t("quality"))
+        self._q_label.setObjectName("fieldLabel")
+        layout.addWidget(self._q_label)
         layout.addSpacing(8)
 
         q_row = QHBoxLayout()
@@ -130,37 +126,65 @@ class DetailPanel(QWidget):
             btn.setCheckable(True)
             btn.setFixedHeight(36)
             if q == "1080p":
-                btn.setChecked(True)
+                btn.setChecked(True)  # default to highest quality
             self._quality_group.addButton(btn)
             self._quality_btns[q] = btn
             q_row.addWidget(btn)
         layout.addLayout(q_row)
         layout.addSpacing(20)
 
-        # Save path row
         save_row = QHBoxLayout()
-        save_label = QLabel("Save to:")
-        save_label.setObjectName("fieldLabel")
+        self._save_label = QLabel(i18n.t("save_to"))
+        self._save_label.setObjectName("fieldLabel")
         self._folder_label = QLabel(get_download_folder())
         self._folder_label.setObjectName("folderPath")
         self._folder_label.setWordWrap(False)
-        change_btn = QPushButton("Change")
-        change_btn.setObjectName("linkBtn")
-        change_btn.setFlat(True)
-        change_btn.clicked.connect(self._pick_folder)
-        save_row.addWidget(save_label)
+        self._change_btn = QPushButton(i18n.t("change"))
+        self._change_btn.setObjectName("linkBtn")
+        self._change_btn.setFlat(True)
+        self._change_btn.clicked.connect(self._pick_folder)
+        save_row.addWidget(self._save_label)
         save_row.addWidget(self._folder_label, 1)
-        save_row.addWidget(change_btn)
+        save_row.addWidget(self._change_btn)
         layout.addLayout(save_row)
         layout.addSpacing(16)
 
-        # Download button
-        self._download_btn = QPushButton("⬇  Download Now")
+        self._download_btn = QPushButton(i18n.t("download_now"))
         self._download_btn.setObjectName("downloadBtn")
         self._download_btn.setFixedHeight(52)
         self._download_btn.clicked.connect(self._on_download)
         layout.addWidget(self._download_btn)
         layout.addStretch()
+
+    def retranslate_ui(self) -> None:
+        self._now_label.setText(i18n.t("now_selecting"))
+        self._tr_label.setText(i18n.t("dubbing_label"))
+        self._season_label.setText(i18n.t("season"))
+        self._episode_label.setText(i18n.t("episode"))
+        self._q_label.setText(i18n.t("quality"))
+        self._save_label.setText(i18n.t("save_to"))
+        self._change_btn.setText(i18n.t("change"))
+        self._download_btn.setText(i18n.t("download_now"))
+
+        if self._info is not None and self._info.is_series and self._info.seasons:
+            cur_season = self._season_combo.currentData()
+            self._season_combo.blockSignals(True)
+            self._season_combo.clear()
+            for s in sorted(self._info.seasons):
+                self._season_combo.addItem(i18n.t("season_n", n=s), s)
+            idx = self._season_combo.findData(cur_season)
+            if idx >= 0:
+                self._season_combo.setCurrentIndex(idx)
+            self._season_combo.blockSignals(False)
+
+            cur_ep = self._episode_combo.currentData()
+            self._episode_combo.clear()
+            season = self._season_combo.currentData()
+            for ep in sorted(self._info.seasons.get(season, [])):
+                self._episode_combo.addItem(i18n.t("episode_n", n=ep), ep)
+            idx = self._episode_combo.findData(cur_ep)
+            if idx >= 0:
+                self._episode_combo.setCurrentIndex(idx)
 
     def _set_enabled(self, enabled: bool) -> None:
         for w in [self._translator_combo, self._season_combo,
@@ -176,7 +200,7 @@ class DetailPanel(QWidget):
         self._translator_combo.clear()
         self._season_combo.clear()
         self._episode_combo.clear()
-        self.status_message.emit("Loading info…")
+        self.status_message.emit(i18n.t("loading_info"))
 
         if self._worker is not None and self._worker.isRunning():
             self._worker.quit()
@@ -199,14 +223,14 @@ class DetailPanel(QWidget):
         if has_seasons:
             self._season_combo.clear()
             for s in sorted(info.seasons):
-                self._season_combo.addItem(f"Season {s}", s)
+                self._season_combo.addItem(i18n.t("season_n", n=s), s)
             self._on_season_changed(0)
 
         self._set_enabled(True)
-        self.status_message.emit("Ready")
+        self.status_message.emit(i18n.t("ready"))
 
     def _on_error(self, msg: str) -> None:
-        self.status_message.emit(f"Error: {msg}")
+        self.status_message.emit(i18n.t("error_msg", msg=msg))
 
     def _on_season_changed(self, _: int) -> None:
         if self._info is None:
@@ -216,11 +240,11 @@ class DetailPanel(QWidget):
             return
         self._episode_combo.clear()
         for ep in sorted(self._info.seasons.get(season, [])):
-            self._episode_combo.addItem(f"Episode {ep}", ep)
+            self._episode_combo.addItem(i18n.t("episode_n", n=ep), ep)
 
     def _pick_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
-            self, "Select download folder", get_download_folder()
+            self, i18n.t("select_folder"), get_download_folder()
         )
         if folder:
             set_download_folder(folder)

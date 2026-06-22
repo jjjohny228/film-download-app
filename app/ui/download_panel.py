@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from app import i18n
 from app.core.downloader import DownloadWorker
 from app.core.rezka import get_stream_url
 
@@ -49,12 +50,12 @@ class _DownloadRow(QWidget):
         super().__init__(parent)
         self.setObjectName("downloadRow")
         self._is_done = False
+        self._badge_key = "waiting"
 
         outer = QVBoxLayout(self)
         outer.setContentsMargins(16, 12, 16, 12)
         outer.setSpacing(6)
 
-        # Top row: filename | status badge | size | pause | X
         top = QHBoxLayout()
         top.setSpacing(10)
 
@@ -63,7 +64,7 @@ class _DownloadRow(QWidget):
         self._name_lbl.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         top.addWidget(self._name_lbl, 1)
 
-        self._status_badge = QLabel("WAITING")
+        self._status_badge = QLabel(i18n.t("waiting"))
         self._status_badge.setObjectName("dlBadge")
         self._status_badge.setFixedHeight(22)
         top.addWidget(self._status_badge)
@@ -86,7 +87,6 @@ class _DownloadRow(QWidget):
 
         outer.addLayout(top)
 
-        # Progress bar
         self._bar = QProgressBar()
         self._bar.setObjectName("dlBar")
         self._bar.setRange(0, 100)
@@ -95,44 +95,44 @@ class _DownloadRow(QWidget):
         self._bar.setTextVisible(False)
         outer.addWidget(self._bar)
 
+    def _apply_badge(self, key: str, obj_name: str) -> None:
+        self._badge_key = key
+        self._status_badge.setText(i18n.t(key))
+        self._status_badge.setObjectName(obj_name)
+        self._status_badge.style().unpolish(self._status_badge)
+        self._status_badge.style().polish(self._status_badge)
+
     def set_progress(self, downloaded: int, total: int) -> None:
         if total > 0:
             self._bar.setValue(int(downloaded / total * 100))
         mb_d = downloaded / 1024 / 1024
         mb_t = total / 1024 / 1024
         self._size_lbl.setText(f"{mb_d:.1f} / {mb_t:.1f} MB")
-        self._status_badge.setText("DOWNLOADING")
-        self._status_badge.setObjectName("dlBadgeActive")
-        self._status_badge.style().unpolish(self._status_badge)
-        self._status_badge.style().polish(self._status_badge)
+        self._apply_badge("downloading", "dlBadgeActive")
 
     def set_paused(self, paused: bool) -> None:
         self._pause_btn.setText("▶" if paused else "⏸")
-        badge = "PAUSED" if paused else "DOWNLOADING"
-        obj = "dlBadgePaused" if paused else "dlBadgeActive"
-        self._status_badge.setText(badge)
-        self._status_badge.setObjectName(obj)
-        self._status_badge.style().unpolish(self._status_badge)
-        self._status_badge.style().polish(self._status_badge)
+        if paused:
+            self._apply_badge("paused", "dlBadgePaused")
+        else:
+            self._apply_badge("downloading", "dlBadgeActive")
 
     def set_done(self) -> None:
         self._is_done = True
         self._bar.setValue(100)
-        self._status_badge.setText("DONE")
-        self._status_badge.setObjectName("dlBadgeDone")
-        self._status_badge.style().unpolish(self._status_badge)
-        self._status_badge.style().polish(self._status_badge)
+        self._apply_badge("done", "dlBadgeDone")
         self._pause_btn.setEnabled(False)
         self._cancel_btn.setEnabled(False)
 
     def set_error(self, msg: str) -> None:
-        self._status_badge.setText("ERROR")
-        self._status_badge.setObjectName("dlBadgeError")
-        self._status_badge.style().unpolish(self._status_badge)
-        self._status_badge.style().polish(self._status_badge)
+        self._apply_badge("error", "dlBadgeError")
         self._name_lbl.setText(f"{self._name_lbl.text()} — {msg}")
         self._pause_btn.setEnabled(False)
         self._cancel_btn.setEnabled(False)
+
+    def retranslate_ui(self) -> None:
+        if self._badge_key in ("waiting", "downloading", "paused", "done"):
+            self._status_badge.setText(i18n.t(self._badge_key))
 
     def connect_pause(self, slot: "Callable") -> None:
         self._pause_btn.clicked.connect(slot)
@@ -149,7 +149,7 @@ class DownloadPanel(QWidget):
         super().__init__(parent)
         self.setObjectName("downloadPanel")
         self._workers: list[tuple[_DownloadRow, DownloadWorker | _ResolveWorker]] = []
-        self._active_count = 0
+        self._rows: list[_DownloadRow] = []
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -157,17 +157,16 @@ class DownloadPanel(QWidget):
         outer.setContentsMargins(20, 12, 20, 12)
         outer.setSpacing(8)
 
-        # Header row
         header = QHBoxLayout()
-        self._header_lbl = QLabel("ACTIVE DOWNLOADS (0)")
+        self._header_lbl = QLabel(i18n.t("active_downloads", n=0))
         self._header_lbl.setObjectName("dlHeader")
         header.addWidget(self._header_lbl)
         header.addStretch()
-        clear_btn = QPushButton("Clear Finished")
-        clear_btn.setObjectName("linkBtn")
-        clear_btn.setFlat(True)
-        clear_btn.clicked.connect(self._clear_finished)
-        header.addWidget(clear_btn)
+        self._clear_btn = QPushButton(i18n.t("clear_finished"))
+        self._clear_btn.setObjectName("linkBtn")
+        self._clear_btn.setFlat(True)
+        self._clear_btn.clicked.connect(self._clear_finished)
+        header.addWidget(self._clear_btn)
         outer.addLayout(header)
 
         scroll = QScrollArea()
@@ -181,24 +180,33 @@ class DownloadPanel(QWidget):
         scroll.setWidget(container)
         outer.addWidget(scroll)
 
+    def retranslate_ui(self) -> None:
+        self._update_header()
+        self._clear_btn.setText(i18n.t("clear_finished"))
+        for row in self._rows:
+            row.retranslate_ui()
+
     def _update_header(self) -> None:
         active = sum(
             1 for _, w in self._workers
             if isinstance(w, DownloadWorker) and w.isRunning() and not w.is_paused
         )
-        self._header_lbl.setText(f"ACTIVE DOWNLOADS ({active})")
+        self._header_lbl.setText(i18n.t("active_downloads", n=active))
 
     def _clear_finished(self) -> None:
         for row, _ in list(self._workers):
             if row.is_done:
                 self._rows_layout.removeWidget(row)
                 row.deleteLater()
+                if row in self._rows:
+                    self._rows.remove(row)
         self._workers = [(r, w) for r, w in self._workers if not r.is_done]
 
     def add_download(self, page_url: str, translator_id: str, quality: str,
                      season: int, episode: int, save_path: str) -> None:
         filename = os.path.basename(save_path)
         row = _DownloadRow(filename)
+        self._rows.append(row)
         self._rows_layout.insertWidget(self._rows_layout.count() - 1, row)
 
         resolver = _ResolveWorker(page_url, translator_id, quality, season, episode, save_path)
@@ -212,7 +220,7 @@ class DownloadPanel(QWidget):
 
             def _on_finished(p: str) -> None:
                 row.set_done()
-                self.status_message.emit(f"Downloaded: {os.path.basename(p)}")
+                self.status_message.emit(i18n.t("downloaded", name=os.path.basename(p)))
                 self._workers[:] = [(r, w) for r, w in self._workers if w is not dl]
                 self._update_header()
 
@@ -225,7 +233,6 @@ class DownloadPanel(QWidget):
             dl.error.connect(_on_error)
             self._workers.append((row, dl))
 
-            # Pause button toggles pause/resume
             def _toggle_pause() -> None:
                 if dl.is_paused:
                     dl.resume()
@@ -237,10 +244,9 @@ class DownloadPanel(QWidget):
 
             row.connect_pause(_toggle_pause)
 
-            # Cancel button cancels download + deletes partial file
             def _on_cancel() -> None:
                 dl.cancel()
-                row.set_error("Cancelled")
+                row.set_error(i18n.t("cancelled"))
                 self._workers[:] = [(r, w) for r, w in self._workers if w is not dl]
                 self._update_header()
 
@@ -250,7 +256,7 @@ class DownloadPanel(QWidget):
 
         def on_error(msg: str) -> None:
             row.set_error(msg)
-            self.status_message.emit(f"Link error: {msg}")
+            self.status_message.emit(i18n.t("link_error", msg=msg))
             self._workers[:] = [(r, w) for r, w in self._workers if w is not resolver]
             self._update_header()
 
@@ -258,5 +264,5 @@ class DownloadPanel(QWidget):
         resolver.error.connect(on_error)
         self._workers.append((row, resolver))
         resolver.start()
-        self.status_message.emit(f"Fetching link for {filename}…")
+        self.status_message.emit(i18n.t("fetching_link", name=filename))
         self._update_header()

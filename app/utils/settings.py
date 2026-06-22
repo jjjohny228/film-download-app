@@ -24,3 +24,11 @@ def get_rezka_url() -> str:
 
 def set_rezka_url(url: str) -> None:
     _s().setValue("rezka_url", url)
+
+
+def get_language() -> str:
+    return _s().value("language", "en")
+
+
+def set_language(lang: str) -> None:
+    _s().setValue("language", lang)
