@@ -1,4 +1,5 @@
 import os
+from collections.abc import Callable
 
 from PySide6.QtCore import QThread, Signal
 from PySide6.QtWidgets import (
@@ -88,7 +89,7 @@ class _DownloadRow(QWidget):
         self._status.setText(f"Ошибка: {msg}")
         self._cancel_btn.setEnabled(False)
 
-    def connect_cancel(self, slot) -> None:
+    def connect_cancel(self, slot: "Callable") -> None:
         self._cancel_btn.clicked.connect(slot)
 
 
@@ -130,11 +131,23 @@ class DownloadPanel(QWidget):
         resolver = _ResolveWorker(page_url, translator_id, quality, season, episode, save_path)
 
         def on_url_ready(stream_url: str, sp: str) -> None:
+            # Disconnect to prevent double-emit
+            resolver.url_ready.disconnect(on_url_ready)
+
             dl = DownloadWorker(stream_url, sp)
             dl.progress.connect(row.set_progress)
-            dl.finished.connect(lambda _: row.set_done())
-            dl.finished.connect(lambda p: self.status_message.emit(f"Скачано: {os.path.basename(p)}"))
-            dl.error.connect(row.set_error)
+
+            def _on_finished(p: str) -> None:
+                row.set_done()
+                self.status_message.emit(f"Скачано: {os.path.basename(p)}")
+                self._workers[:] = [(r, w) for r, w in self._workers if w is not dl]
+
+            def _on_error(msg: str) -> None:
+                row.set_error(msg)
+                self._workers[:] = [(r, w) for r, w in self._workers if w is not dl]
+
+            dl.finished.connect(_on_finished)
+            dl.error.connect(_on_error)
             self._workers.append((row, dl))
             row.connect_cancel(dl.cancel)
             dl.start()
