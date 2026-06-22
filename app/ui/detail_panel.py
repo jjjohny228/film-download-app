@@ -1,6 +1,7 @@
 import os
 
 from PySide6.QtCore import QThread, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
@@ -50,9 +51,19 @@ class DetailPanel(QWidget):
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(14)
+
         form = QFormLayout()
+        form.setSpacing(10)
+        form.setHorizontalSpacing(16)
 
         self._title_label = QLabel("—")
+        self._title_label.setWordWrap(True)
+        font = QFont()
+        font.setPointSize(13)
+        font.setBold(True)
+        self._title_label.setFont(font)
         form.addRow("Название:", self._title_label)
 
         self._translator_combo = QComboBox()
@@ -93,7 +104,9 @@ class DetailPanel(QWidget):
         layout.addLayout(folder_layout)
 
         self._download_btn = QPushButton("▼ Скачать")
+        self._download_btn.setMinimumHeight(40)
         self._download_btn.clicked.connect(self._on_download)
+        layout.addSpacing(8)
         layout.addWidget(self._download_btn)
         layout.addStretch()
 

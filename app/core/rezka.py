@@ -11,6 +11,7 @@ class SearchResult:
     url: str
     year: str
     is_series: bool
+    poster: str = ""
 
 
 @dataclass
@@ -35,6 +36,7 @@ def search(query: str, base_url: str = DEFAULT_URL) -> list[SearchResult]:
                 url=str(item.get("url", "")),
                 year=str(item.get("year", "")),
                 is_series=is_series,
+                poster=str(item.get("image", "")),
             )
         )
     return output

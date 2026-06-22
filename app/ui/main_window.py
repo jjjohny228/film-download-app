@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import QMainWindow, QSplitter, QStatusBar
+from PySide6.QtWidgets import QHBoxLayout, QMainWindow, QSplitter, QStatusBar, QWidget
 
 from app.ui.detail_panel import DetailPanel
 from app.ui.download_panel import DownloadPanel
@@ -21,25 +21,34 @@ class MainWindow(QMainWindow):
         self._detail = DetailPanel()
         self._downloads = DownloadPanel()
 
-        top_splitter = QSplitter(Qt.Orientation.Horizontal)
-        top_splitter.addWidget(self._search)
-        top_splitter.addWidget(self._detail)
-        top_splitter.setStretchFactor(0, 1)
-        top_splitter.setStretchFactor(1, 1)
+        # Top: search + detail side by side; detail hidden until selection
+        top_widget = QWidget()
+        top_layout = QHBoxLayout(top_widget)
+        top_layout.setContentsMargins(0, 0, 0, 0)
+        top_layout.setSpacing(0)
+        top_layout.addWidget(self._search)
+        top_layout.addWidget(self._detail)
+        self._detail.setVisible(False)
 
         main_splitter = QSplitter(Qt.Orientation.Vertical)
-        main_splitter.addWidget(top_splitter)
+        main_splitter.addWidget(top_widget)
         main_splitter.addWidget(self._downloads)
-        main_splitter.setStretchFactor(0, 2)
+        main_splitter.setStretchFactor(0, 3)
         main_splitter.setStretchFactor(1, 1)
+        main_splitter.setSizes([450, 150])
 
         self.setCentralWidget(main_splitter)
 
-        self._search.result_selected.connect(self._detail.load)
+        self._search.result_selected.connect(self._on_result_selected)
         self._search.status_message.connect(status_bar.showMessage)
         self._detail.status_message.connect(status_bar.showMessage)
         self._detail.download_requested.connect(self._on_download_requested)
         self._downloads.status_message.connect(status_bar.showMessage)
+
+    def _on_result_selected(self, result) -> None:
+        if not self._detail.isVisible():
+            self._detail.setVisible(True)
+        self._detail.load(result)
 
     def _on_download_requested(
         self,

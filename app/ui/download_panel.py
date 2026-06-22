@@ -57,7 +57,7 @@ class _DownloadRow(QWidget):
     def __init__(self, filename: str, parent=None) -> None:
         super().__init__(parent)
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(4, 2, 4, 2)
+        layout.setContentsMargins(8, 6, 8, 6)
 
         self._label = QLabel(filename)
         self._label.setMinimumWidth(200)
@@ -103,7 +103,8 @@ class DownloadPanel(QWidget):
 
     def _build_ui(self) -> None:
         outer = QVBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setContentsMargins(12, 8, 12, 8)
+        outer.setSpacing(6)
         outer.addWidget(QLabel("Загрузки:"))
 
         scroll = QScrollArea()
