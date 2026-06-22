@@ -6,11 +6,9 @@ from PySide6.QtWidgets import (
     QButtonGroup,
     QComboBox,
     QFileDialog,
-    QFormLayout,
     QHBoxLayout,
     QLabel,
     QPushButton,
-    QRadioButton,
     QVBoxLayout,
     QWidget,
 )
@@ -46,67 +44,121 @@ class DetailPanel(QWidget):
         self._current_url: str = ""
         self._info: FilmInfo | None = None
         self._worker: _InfoWorker | None = None
+        self.setObjectName("detailCard")
+        self.setFixedWidth(380)
         self._build_ui()
         self._set_enabled(False)
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(20, 20, 20, 20)
-        layout.setSpacing(14)
+        layout.setContentsMargins(24, 24, 24, 24)
+        layout.setSpacing(0)
 
-        form = QFormLayout()
-        form.setSpacing(10)
-        form.setHorizontalSpacing(16)
+        # "NOW SELECTING" header
+        now_label = QLabel("NOW SELECTING")
+        now_label.setObjectName("nowSelecting")
+        layout.addWidget(now_label)
+        layout.addSpacing(6)
 
+        # Title
         self._title_label = QLabel("—")
+        self._title_label.setObjectName("detailTitle")
         self._title_label.setWordWrap(True)
-        font = QFont()
-        font.setPointSize(13)
-        font.setBold(True)
-        self._title_label.setFont(font)
-        form.addRow("Название:", self._title_label)
+        title_font = QFont()
+        title_font.setPointSize(18)
+        title_font.setBold(True)
+        self._title_label.setFont(title_font)
+        layout.addWidget(self._title_label)
+        layout.addSpacing(20)
 
+        # Translator
+        tr_label = QLabel("Dubbing / Translation")
+        tr_label.setObjectName("fieldLabel")
+        layout.addWidget(tr_label)
+        layout.addSpacing(6)
         self._translator_combo = QComboBox()
-        self._translator_combo.currentIndexChanged.connect(self._on_translator_changed)
-        form.addRow("Перевод:", self._translator_combo)
+        self._translator_combo.setObjectName("detailCombo")
+        self._translator_combo.setFixedHeight(44)
+        layout.addWidget(self._translator_combo)
+        layout.addSpacing(16)
 
+        # Season + Episode side by side
+        se_row = QHBoxLayout()
+        se_row.setSpacing(12)
+
+        season_col = QVBoxLayout()
+        self._season_label = QLabel("Season")
+        self._season_label.setObjectName("fieldLabel")
         self._season_combo = QComboBox()
+        self._season_combo.setObjectName("detailCombo")
+        self._season_combo.setFixedHeight(44)
         self._season_combo.currentIndexChanged.connect(self._on_season_changed)
-        self._season_label = QLabel("Сезон:")
-        form.addRow(self._season_label, self._season_combo)
+        season_col.addWidget(self._season_label)
+        season_col.addSpacing(6)
+        season_col.addWidget(self._season_combo)
 
+        episode_col = QVBoxLayout()
+        self._episode_label = QLabel("Episode")
+        self._episode_label.setObjectName("fieldLabel")
         self._episode_combo = QComboBox()
-        self._episode_label = QLabel("Серия:")
-        form.addRow(self._episode_label, self._episode_combo)
+        self._episode_combo.setObjectName("detailCombo")
+        self._episode_combo.setFixedHeight(44)
+        episode_col.addWidget(self._episode_label)
+        episode_col.addSpacing(6)
+        episode_col.addWidget(self._episode_combo)
 
-        layout.addLayout(form)
+        se_row.addLayout(season_col)
+        se_row.addLayout(episode_col)
+        self._se_widget = QWidget()
+        self._se_widget.setLayout(se_row)
+        layout.addWidget(self._se_widget)
+        layout.addSpacing(16)
 
-        quality_layout = QHBoxLayout()
-        quality_layout.addWidget(QLabel("Качество:"))
-        self._quality_group = QButtonGroup(self)
-        for q in QUALITIES:
-            rb = QRadioButton(q)
-            if q == "1080p":
-                rb.setChecked(True)
-            self._quality_group.addButton(rb)
-            quality_layout.addWidget(rb)
-        quality_layout.addStretch()
-        layout.addLayout(quality_layout)
-
-        folder_layout = QHBoxLayout()
-        self._folder_label = QLabel(get_download_folder())
-        self._folder_label.setWordWrap(True)
-        folder_btn = QPushButton("Изменить…")
-        folder_btn.clicked.connect(self._pick_folder)
-        folder_layout.addWidget(QLabel("Папка:"))
-        folder_layout.addWidget(self._folder_label, 1)
-        folder_layout.addWidget(folder_btn)
-        layout.addLayout(folder_layout)
-
-        self._download_btn = QPushButton("▼ Скачать")
-        self._download_btn.setMinimumHeight(40)
-        self._download_btn.clicked.connect(self._on_download)
+        # Quality
+        q_label = QLabel("Quality")
+        q_label.setObjectName("fieldLabel")
+        layout.addWidget(q_label)
         layout.addSpacing(8)
+
+        q_row = QHBoxLayout()
+        q_row.setSpacing(8)
+        self._quality_group = QButtonGroup(self)
+        self._quality_btns: dict[str, QPushButton] = {}
+        for q in QUALITIES:
+            btn = QPushButton(q)
+            btn.setObjectName("qualityBtn")
+            btn.setCheckable(True)
+            btn.setFixedHeight(36)
+            if q == "1080p":
+                btn.setChecked(True)
+            self._quality_group.addButton(btn)
+            self._quality_btns[q] = btn
+            q_row.addWidget(btn)
+        layout.addLayout(q_row)
+        layout.addSpacing(20)
+
+        # Save path row
+        save_row = QHBoxLayout()
+        save_label = QLabel("Save to:")
+        save_label.setObjectName("fieldLabel")
+        self._folder_label = QLabel(get_download_folder())
+        self._folder_label.setObjectName("folderPath")
+        self._folder_label.setWordWrap(False)
+        change_btn = QPushButton("Change")
+        change_btn.setObjectName("linkBtn")
+        change_btn.setFlat(True)
+        change_btn.clicked.connect(self._pick_folder)
+        save_row.addWidget(save_label)
+        save_row.addWidget(self._folder_label, 1)
+        save_row.addWidget(change_btn)
+        layout.addLayout(save_row)
+        layout.addSpacing(16)
+
+        # Download button
+        self._download_btn = QPushButton("⬇  Download Now")
+        self._download_btn.setObjectName("downloadBtn")
+        self._download_btn.setFixedHeight(52)
+        self._download_btn.clicked.connect(self._on_download)
         layout.addWidget(self._download_btn)
         layout.addStretch()
 
@@ -124,7 +176,7 @@ class DetailPanel(QWidget):
         self._translator_combo.clear()
         self._season_combo.clear()
         self._episode_combo.clear()
-        self.status_message.emit("Загрузка информации…")
+        self.status_message.emit("Loading info…")
 
         if self._worker is not None and self._worker.isRunning():
             self._worker.quit()
@@ -142,25 +194,19 @@ class DetailPanel(QWidget):
             self._translator_combo.addItem(name)
 
         has_seasons = info.is_series and bool(info.seasons)
-        self._season_label.setVisible(has_seasons)
-        self._season_combo.setVisible(has_seasons)
-        self._episode_label.setVisible(has_seasons)
-        self._episode_combo.setVisible(has_seasons)
+        self._se_widget.setVisible(has_seasons)
 
         if has_seasons:
             self._season_combo.clear()
             for s in sorted(info.seasons):
-                self._season_combo.addItem(str(s), s)
+                self._season_combo.addItem(f"Season {s}", s)
             self._on_season_changed(0)
 
         self._set_enabled(True)
-        self.status_message.emit("Готово")
+        self.status_message.emit("Ready")
 
     def _on_error(self, msg: str) -> None:
-        self.status_message.emit(f"Ошибка: {msg}")
-
-    def _on_translator_changed(self, _: int) -> None:
-        pass  # future: reload seasons per translator if needed
+        self.status_message.emit(f"Error: {msg}")
 
     def _on_season_changed(self, _: int) -> None:
         if self._info is None:
@@ -170,11 +216,11 @@ class DetailPanel(QWidget):
             return
         self._episode_combo.clear()
         for ep in sorted(self._info.seasons.get(season, [])):
-            self._episode_combo.addItem(str(ep), ep)
+            self._episode_combo.addItem(f"Episode {ep}", ep)
 
     def _pick_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
-            self, "Выберите папку для загрузки", get_download_folder()
+            self, "Select download folder", get_download_folder()
         )
         if folder:
             set_download_folder(folder)
